@@ -9,7 +9,12 @@ function isSceneNode(node) {
 
 function cleanMarkdown(value) {
   if (!value) return "";
-  return value.replace(/!\\[[^\\]]*\\]\\([^)]*\\)/g, "").replace(/\\[([^\\]]+)\\]\\([^)]*\\)/g, "$1").replace(/[*_~>#]/g, "").replace(/\\s+/g, " ").trim();
+  return value
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/[*_~>#]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function getNodePath(node) {
@@ -116,7 +121,7 @@ async function getStoredEndpoint() {
 async function createHandoff(endpoint, payload) {
   const url = String(endpoint || "").trim();
   if (!url) throw new Error("Add your Vercel handoff API URL first.");
-  if (!/^https:\\/\\/[^\\s]+$/i.test(url)) throw new Error("Use an HTTPS URL for the handoff API.");
+  if (!/^https:\/\/[^\s]+$/i.test(url)) throw new Error("Use an HTTPS URL for the handoff API.");
   await figma.clientStorage.setAsync("annotationNavEndpoint", url);
 
   const response = await fetch(url, {
