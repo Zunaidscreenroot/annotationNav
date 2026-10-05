@@ -12,5 +12,11 @@
     "react": "latest",
     "react-dom": "latest",
     "@vercel/blob": "latest"
+  },
+  "devDependencies": {
+    "typescript": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest"
   }
 }
