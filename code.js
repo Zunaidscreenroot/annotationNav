@@ -52,6 +52,11 @@ function nodeY(node) {
 
 async function scanCurrentPage() {
   const page = figma.currentPage;
+
+  // Required when the plugin manifest uses documentAccess: dynamic-page.
+  // Page content must be loaded before calling findAll/findAllWithCriteria.
+  await page.loadAsync();
+
   const categories = await figma.annotations.getAnnotationCategoriesAsync();
   const categoryMap = new Map(categories.map(category => [category.id, category]));
 
@@ -182,5 +187,10 @@ figma.on("currentpagechange", async () => {
   }
 });
 
-sendState();
+sendState().catch(error => {
+  figma.ui.postMessage({
+    type: "error",
+    message: error && error.message ? error.message : String(error)
+  });
+});
 getStoredEndpoint().then(endpoint => figma.ui.postMessage({ type: "endpoint", endpoint }));
