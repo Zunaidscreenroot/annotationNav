@@ -1,0 +1,12 @@
+{
+  "name": "AnnotationNav",
+  "api": "1.0.0",
+  "editorType": ["figma"],
+  "main": "code.js",
+  "ui": "ui.html",
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": ["*.vercel.app"],
+    "reasoning": "AnnotationNav optionally sends exported native Figma annotations to the user own Vercel handoff API to create a developer-facing handoff link."
+  }
+}
