@@ -53,24 +53,59 @@ function nodeY(node) {
 async function scanCurrentPage() {
   const page = figma.currentPage;
 
-  // Required when the plugin manifest uses documentAccess: dynamic-page.
-  // Page content must be loaded before calling findAll/findAllWithCriteria.
+  // Dynamic-page plugins must explicitly load the page before traversing it.
+  figma.ui.postMessage({ type: "scanStatus", message: "Loading current page…" });
   await page.loadAsync();
 
+  figma.ui.postMessage({ type: "scanStatus", message: "Reading annotation categories…" });
   const categories = await figma.annotations.getAnnotationCategoriesAsync();
   const categoryMap = new Map(categories.map(category => [category.id, category]));
 
-  const annotatedNodes = page.findAll(node => {
-    return "annotations" in node && Array.isArray(node.annotations) && node.annotations.length > 0;
+  figma.ui.postMessage({ type: "scanStatus", message: "Finding annotated layers…" });
+
+  // Annotations are supported on these design node types. Using criteria is
+  // faster and more deterministic than checking every node with a callback.
+  const annotatedCandidates = page.findAllWithCriteria({
+    types: [
+      "COMPONENT",
+      "COMPONENT_SET",
+      "ELLIPSE",
+      "FRAME",
+      "INSTANCE",
+      "LINE",
+      "POLYGON",
+      "RECTANGLE",
+      "STAR",
+      "TEXT",
+      "TEXT_PATH",
+      "VECTOR"
+    ]
   });
 
   const annotations = [];
 
-  for (const node of annotatedNodes) {
-    const nodeAnnotations = node.annotations || [];
-    nodeAnnotations.forEach((annotation, annotationIndex) => {
-      const label = annotation.label || cleanMarkdown(annotation.labelMarkdown) || "Untitled annotation";
-      const category = annotation.categoryId ? categoryMap.get(annotation.categoryId) : null;
+  figma.ui.postMessage({
+    type: "scanStatus",
+    message: "Checking " + annotatedCandidates.length + " layers for annotations…"
+  });
+
+  for (let i = 0; i < annotatedCandidates.length; i++) {
+    const node = annotatedCandidates[i];
+
+    if (!Array.isArray(node.annotations) || node.annotations.length === 0) {
+      continue;
+    }
+
+    node.annotations.forEach((annotation, annotationIndex) => {
+      const label =
+        annotation.label ||
+        cleanMarkdown(annotation.labelMarkdown) ||
+        "Untitled annotation";
+
+      const category = annotation.categoryId
+        ? categoryMap.get(annotation.categoryId)
+        : null;
+
       annotations.push({
         key: page.id + "::" + node.id + "::" + annotationIndex,
         index: annotationIndex,
@@ -83,10 +118,13 @@ async function scanCurrentPage() {
         nodePath: getNodePath(node),
         label: label,
         labelMarkdown: annotation.labelMarkdown || null,
-        properties: Array.isArray(annotation.properties) ? annotation.properties.map(property => property.type) : [],
+        properties: Array.isArray(annotation.properties)
+          ? annotation.properties.map(property => property.type)
+          : [],
         categoryId: annotation.categoryId || null,
         categoryLabel: category ? category.label : null,
-        figmaUrl: getFigmaNodeUrl(figma.fileKey, node.id)
+        figmaUrl: getFigmaNodeUrl(figma.fileKey, node.id),
+        y: nodeY(node)
       });
     });
   }
@@ -94,11 +132,20 @@ async function scanCurrentPage() {
   annotations.sort((a, b) => {
     const byScreen = a.screenName.localeCompare(b.screenName);
     if (byScreen !== 0) return byScreen;
-    const nodeA = annotatedNodes.find(node => node.id === a.nodeId);
-    const nodeB = annotatedNodes.find(node => node.id === b.nodeId);
-    const byY = nodeY(nodeA) - nodeY(nodeB);
+
+    const byY = a.y - b.y;
     if (byY !== 0) return byY;
+
     return a.nodeName.localeCompare(b.nodeName);
+  });
+
+  annotations.forEach(annotation => {
+    delete annotation.y;
+  });
+
+  figma.ui.postMessage({
+    type: "scanStatus",
+    message: "Scan complete — " + annotations.length + " annotation" + (annotations.length === 1 ? "" : "s") + "."
   });
 
   return {
@@ -112,7 +159,6 @@ async function scanCurrentPage() {
     annotations
   };
 }
-
 async function sendState() {
   const payload = await scanCurrentPage();
   figma.ui.postMessage({ type: "annotations", payload });
